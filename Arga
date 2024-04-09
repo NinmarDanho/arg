@@ -1,0 +1,123 @@
+import tkinter as tk
+from tkinter import messagebox, simpledialog
+from datetime import datetime
+
+class SpelGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Arga-trollet Spelet")
+        self.välkommen()
+        self.storleken = self.välj_storlek()
+        self.tilåtna_förösk = 5
+        self.initiera_spelkomponenter()
+        self.starttid = datetime.now()
+
+    def välkommen(self):
+        messagebox.showinfo("Välkommen", "Välkommen till Arga-trollet spelet!\nFörsök att placera ett 'troll' i varje rad och kolumn, utan att några 'troll' kan se varandra diagonalt.")
+
+    def välj_storlek(self):
+        return simpledialog.askinteger("Storlek", "Ange storleken på brädet (4-8):", minvalue=4, maxvalue=8)
+
+    def initiera_spelkomponenter(self):
+        self.brädet = [[tk.Button(self.root, text=' ', width=4, height=2, command=lambda r=r, c=c: self.knapp_klick(r, c)) for c in range(self.storleken)] for r in range(self.storleken)]
+        for r in range(self.storleken):
+            for c in range(self.storleken):
+                self.brädet[r][c].grid(row=r, column=c)
+        self.försök_kvar_etikett = tk.Label(self.root, text=f"Antal försök kvar: {self.tilåtna_förösk}")
+        self.försök_kvar_etikett.grid(row=self.storleken, columnspan=self.storleken, sticky="nsew")
+        avsluta_knapp = tk.Button(self.root, text="Avsluta spelet", command=self.avsluta_spelet)
+        avsluta_knapp.grid(row=self.storleken + 1, columnspan=self.storleken, sticky="nsew")
+
+    def avsluta_spelet(self):
+        self.root.destroy()
+        
+    def knapp_klick(self, rad, kolumn):
+        if self.tilåtna_förösk > 0:
+            if self.brädet[rad][kolumn]['text'] == ' ':
+                if self.kontrollera_giltig_placering(rad, kolumn):
+                    self.brädet[rad][kolumn]['text'] = '*'
+                    if self.check_vinst():
+                        self.visa_vinstmeddelande()
+                        return
+                else:
+                    # Om placeringen inte är giltig och användaren inte vinner, minska antalet försök.
+                    self.tilåtna_förösk -= 1
+                    self.försök_kvar_etikett['text'] = f"Antal försök kvar: {self.tilåtna_förösk}"
+            elif self.brädet[rad][kolumn]['text'] == '*':
+                self.brädet[rad][kolumn]['text'] = ' '
+                # Inte öka antalet försök när ett "troll" tas bort.
+                # self.tilåtna_förösk += 1  # Denna rad är nu bortkommenterad.
+                self.försök_kvar_etikett['text'] = f"Antal försök kvar: {self.tilåtna_förösk}"
+                
+        if self.tilåtna_förösk == 0:
+            messagebox.showinfo("Spelet över", "Du har använt alla dina försök. Låt oss lösa spelet!")
+            self.lös_spelet()
+
+   
+   
+
+    def kontrollera_giltig_placering(self, rad, kolumn):
+        # Kontrollera rad och kolumn
+        for i in range(self.storleken):
+            if self.brädet[i][kolumn]['text'] == '*' or self.brädet[rad][i]['text'] == '*':
+                return False
+        # Kontrollera diagonaler
+        for i in range(self.storleken):
+            for j in range(self.storleken):
+                if abs(rad - i) == abs(kolumn - j) and self.brädet[i][j]['text'] == '*':
+                    return False
+        return True
+
+    def lös_spelet(self):
+        def placera_troll(kolumn):
+            if kolumn >= self.storleken:
+                return True
+            for i in range(self.storleken):
+                if self.kontrollera_giltig_placering(i, kolumn):
+                    self.brädet[i][kolumn]['text'] = '*'
+                    if placera_troll(kolumn + 1):
+                        return True
+                    self.brädet[i][kolumn]['text'] = ' '  # Återställer om det inte leder till en lösning
+            return False
+
+        for r in range(self.storleken):
+            for c in range(self.storleken):
+                self.brädet[r][c]['text'] = ' '  # Rensar brädet inför lösningen
+
+        if not placera_troll(0):
+            messagebox.showinfo("Lösning", "Ingen lösning hittades.")
+        else:
+            self.försök_kvar_etikett['text'] = "Spelet löst!"
+
+
+    def check_vinst(self):
+        # Kontrollera om alla rader har ett troll
+        return all(any(self.brädet[r][c]['text'] == '*' for c in range(self.storleken)) for r in range(self.storleken))
+
+    def visa_vinstmeddelande(self):
+        tid_slut = datetime.now()
+        speltid = (tid_slut - self.starttid).total_seconds()
+        namn = simpledialog.askstring("Grattis!", f"Du har vunnit! Din tid var {speltid:.2f} sekunder. Skriv in ditt namn:")
+        if namn:
+            self.spara_highscore(namn, speltid)
+            self.visa_highscore()
+
+    def spara_highscore(self, namn, tid):
+        with open('highscore.txt', 'a') as fil:
+            fil.write(f"{namn} - Storlek: {self.storleken} - Tid: {tid:.2f} sekunder\n")
+
+    def visa_highscore(self):
+        try:
+            with open('highscore.txt', 'r') as fil:
+                highscores = fil.read()
+            messagebox.showinfo("Highscore", highscores)
+        except FileNotFoundError:
+            messagebox.showinfo("Highscore", "Ingen highscore-lista hittades.")
+
+def main():
+    root = tk.Tk()
+    spel = SpelGUI(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
